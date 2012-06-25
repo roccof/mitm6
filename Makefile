@@ -1,7 +1,6 @@
 PROG_NAME = mitm6
 
 SRC = $(wildcard src/*.c)
-HDR = $(wildcard src/*.h)
 OBJS = $(patsubst %.c,%.o,$(SRC))
 
 CFLAGS = -Wall -ggdb3 -I ./src -lm -lpcap -pthread

@@ -20,6 +20,10 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
+#include <pcap.h>
+#include <signal.h>
+
+#include "mitm6.h"
 
 static const struct option long_options[] = {
   {"help", no_argument, NULL, 'h'},
@@ -53,21 +57,49 @@ static void version()
   printf("Please send problems, bugs, questions, desirable enhancements, etc. to: lordzen@autistici.org\n\n");
 }
 
+static void signal_handler_cb(int signal)
+{
+  /* TODO: check for multiples CRTL-C */
+  /* exit(EXIT_SUCCESS); */
+}
+
+static void process_packet(u_char *user, const struct pcap_pkthdr *header, const u_char *bytes)
+{
+  if (header->len == 0 || bytes == NULL)
+    return;
+
+  /* Skip truncated packets */
+  /* if (header->len > gbls->snaplen) { */
+  /*   debug("captured truncated packet [pkt-len: %d, snaplen: %d], skipping...", */
+  /* 	  header->len, gbls->snaplen); */
+  /*   return; */
+  /* } */
+
+  /* TODO */
+}
+
 int main(int argc, char **argv)
 {
   int next_opt = 0;
   int opt_index = 0;
   char *iface = NULL;
-  int no_promisc = 0;
+  int promisc = 1;
   int cap_timeout = 0;
   int cap_snaplen = 65535;
+  char errbuf[PCAP_ERRBUF_SIZE];
+
+  /* atexit(&cleanup); */
+
+  /* Register signals */
+  signal(SIGINT, &signal_handler_cb);
+  signal(SIGTERM, &signal_handler_cb);
 
   /* Parse options */
   while ((next_opt = getopt_long(argc, argv, short_options, long_options, &opt_index)) != -1) {
     switch (next_opt) {
     case 0:
       if (strcmp(long_options[opt_index].name, "no-promisc") == 0) {
-      	no_promisc = 1;
+      	promisc = 0;
       } else if (strcmp(long_options[opt_index].name, "cap-timeout") == 0) {
       	cap_timeout = atoi(optarg);
       } else if (strcmp(long_options[opt_index].name, "cap-snaplen") == 0) {
@@ -93,15 +125,29 @@ int main(int argc, char **argv)
 
     case 'm':
       break;
-	
+      
     default:
       usage();
       return EXIT_FAILURE;
       break;
     }
   }
+  
+  /* Get iface name */
+  if ((iface == NULL) && ((iface = pcap_lookupdev(errbuf)) == NULL)) {
+    /* fatal(errbuf); */
+    exit(-1);
+  }
 
-  /* TODO */
+  /* Open the device for capturing */
+  pcap = pcap_open_live(iface, cap_snaplen, promisc, cap_timeout, errbuf);
+  if (pcap == NULL) {
+    /* fatal(errbuf); */
+    exit(-1);
+  }
+  
+  /* Start sniffing */
+  pcap_loop(pcap, 0, &process_packet, NULL);
 
   return 0;
 }

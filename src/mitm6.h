@@ -19,8 +19,42 @@
 #ifndef MITM6_H
 #define MITM6_H
 
-#inlcude <pcap.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <pcap.h>
 
-pcap_t pcap = NULL;
+#define DEBUG 1
+
+#define MIN(a,b) (a < b ? a : b)
+#define MAX(a,b) (a > b ? a : b)
+
+#define BITNO_32(_x) (((_x) >> 16) ? 16 + BITNO_16((_x) >> 16) : BITNO_16((_x)))
+#define BITNO_16(_x) (((_x) >> 8) ? 8 + BITNO_8((_x) >> 8) : BITNO_8((_x)))
+#define BITNO_8(_x) (((_x) >> 4) ? 4 + BITNO_4((_x) >> 4) : BITNO_4((_x)))
+#define BITNO_4(_x) (((_x) >> 2) ? 2 + BITNO_2((_x) >> 2) : BITNO_2((_x)))
+#define BITNO_2(_x) (((_x) & 2) ? 1 : 0)
+#define BIT(_n)	(1 << _n)
+
+typedef unsigned char _uint8;
+typedef unsigned short _uint16;
+typedef unsigned int _uint32;
+typedef unsigned long _uint64;
+
+typedef char _int8;
+typedef short _int16;
+typedef int _int32;
+typedef long _int64;
+
+typedef unsigned char _uchar;
+typedef unsigned short _ushort;
+typedef unsigned int _uint;
+typedef unsigned long _ulong;
+
+void fatal(const char *, ...);
+void debug(const char *, ...);
+void warning(const char *, ...);
+
+pcap_t *pcap = NULL;
 
 #endif /* MITM6_H */
