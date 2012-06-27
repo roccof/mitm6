@@ -24,10 +24,7 @@
 #include <stdarg.h>
 #include <pcap.h>
 
-#define DEBUG 1
-
-#define MIN(a,b) (a < b ? a : b)
-#define MAX(a,b) (a > b ? a : b)
+#define DEBUG
 
 #define BITNO_32(_x) (((_x) >> 16) ? 16 + BITNO_16((_x) >> 16) : BITNO_16((_x)))
 #define BITNO_16(_x) (((_x) >> 8) ? 8 + BITNO_8((_x) >> 8) : BITNO_8((_x)))
@@ -51,10 +48,19 @@ typedef unsigned short _ushort;
 typedef unsigned int _uint;
 typedef unsigned long _ulong;
 
-void fatal(const char *, ...);
-void debug(const char *, ...);
-void warning(const char *, ...);
+typedef enum _mitm_attacks {
+  NDP_SPOOFING,
+  SLAAC_ATTACK,
+  ICMP6_REDIR,
+  NONE
+} mitm_t;
 
-pcap_t *pcap = NULL;
+void fatal(const char *message, ...);
+void debug(const char *message, ...);
+void warning(const char *message, ...);
+
+void inject_packet(_uchar *bytes, size_t len);
+
+void ndp_spoof(const _uchar *bytes, size_t len);
 
 #endif /* MITM6_H */

@@ -36,6 +36,9 @@ static const struct option long_options[] = {
   {NULL, 0, NULL, 0}
 };
 
+static pcap_t *pcap = NULL;
+static int cap_snaplen = 65535;
+static mitm_t mitm = NONE;
 static const char *short_options = "hvi:m:";
 
 static void usage()
@@ -59,8 +62,8 @@ static void version()
 
 static void signal_handler_cb(int signal)
 {
-  /* TODO: check for multiples CRTL-C */
-  /* exit(EXIT_SUCCESS); */
+  /* TODO: check for multiples CTRL-C */
+  pcap_breakloop(pcap);
 }
 
 static void process_packet(u_char *user, const struct pcap_pkthdr *header, const u_char *bytes)
@@ -69,13 +72,28 @@ static void process_packet(u_char *user, const struct pcap_pkthdr *header, const
     return;
 
   /* Skip truncated packets */
-  /* if (header->len > gbls->snaplen) { */
-  /*   debug("captured truncated packet [pkt-len: %d, snaplen: %d], skipping...", */
-  /* 	  header->len, gbls->snaplen); */
-  /*   return; */
-  /* } */
+  if (header->len > cap_snaplen) {
+    debug("captured truncated packet [pkt-len: %d, snaplen: %d], skipping...",
+  	  header->len, cap_snaplen);
+    return;
+  }
 
-  /* TODO */
+  /* TODO: check mitm type  */
+  switch(mitm) {
+  
+  case NDP_SPOOFING:
+    ndp_spoof(bytes, header->len);
+    break;
+  
+  case NONE:
+  default:
+    break;
+  }
+}
+
+void inject_packet(_uchar *bytes, size_t len)
+{
+  pcap_inject(pcap, (void *)bytes, len);
 }
 
 int main(int argc, char **argv)
@@ -85,10 +103,8 @@ int main(int argc, char **argv)
   char *iface = NULL;
   int promisc = 1;
   int cap_timeout = 0;
-  int cap_snaplen = 65535;
   char errbuf[PCAP_ERRBUF_SIZE];
-
-  /* atexit(&cleanup); */
+  struct bpf_program fp;
 
   /* Register signals */
   signal(SIGINT, &signal_handler_cb);
@@ -105,7 +121,7 @@ int main(int argc, char **argv)
       } else if (strcmp(long_options[opt_index].name, "cap-snaplen") == 0) {
       	cap_snaplen = atoi(optarg);
       } else {
-      	printf("ERROR: '%s' is an invalid option", long_options[opt_index].name);
+      	fatal("'%s' is an invalid option", long_options[opt_index].name);
 	usage();
 	return EXIT_FAILURE;
       }
@@ -124,30 +140,63 @@ int main(int argc, char **argv)
       break;
 
     case 'm':
+      switch(atoi((char *)optarg)) {
+      case 1:
+	mitm = NDP_SPOOFING;
+	break;
+      case 2:
+	mitm = SLAAC_ATTACK;
+	break;
+      case 3:
+	mitm = ICMP6_REDIR;
+	break;
+      default:
+	fatal("invalid MiTM attack");
+	return EXIT_FAILURE;
+      }
       break;
-      
+
     default:
       usage();
       return EXIT_FAILURE;
       break;
     }
   }
-  
+
   /* Get iface name */
   if ((iface == NULL) && ((iface = pcap_lookupdev(errbuf)) == NULL)) {
-    /* fatal(errbuf); */
+    fatal(errbuf);
     exit(-1);
   }
 
   /* Open the device for capturing */
   pcap = pcap_open_live(iface, cap_snaplen, promisc, cap_timeout, errbuf);
   if (pcap == NULL) {
-    /* fatal(errbuf); */
+    fatal(errbuf);
     exit(-1);
   }
-  
+
+  /* TODO: enable */
+  debug("enabled IPv6 forwarding");
+
+  if (pcap_compile(pcap, &fp, "icmp6", 0, PCAP_NETMASK_UNKNOWN) == -1) {
+    fatal("couldn't parse filter: %s", pcap_geterr(pcap));
+    pcap_close(pcap);
+    return EXIT_FAILURE;
+  }
+
+  if (pcap_setfilter(pcap, &fp) == -1) {
+    fatal("couldn't install filter %s", pcap_geterr(pcap));
+    pcap_freecode(&fp);
+    pcap_close(pcap);
+    return EXIT_FAILURE;
+  }
+
   /* Start sniffing */
   pcap_loop(pcap, 0, &process_packet, NULL);
 
+  pcap_freecode(&fp);
+  pcap_close(pcap);
+  
   return 0;
 }

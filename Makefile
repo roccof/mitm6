@@ -17,6 +17,6 @@ mitm6: $(OBJS)
 	$(CC) $(CFLAGS) -o $(PROG_NAME) $(OBJS)
 
 clean:
-	rm src/*.o $(PROG_NAME) *~ src/*~
+	@rm -f src/*.o $(PROG_NAME) *~ src/*~
 
 .PHONY: clean
