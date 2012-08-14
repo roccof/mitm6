@@ -78,7 +78,6 @@ static void process_packet(u_char *user, const struct pcap_pkthdr *header, const
     return;
   }
 
-  /* TODO: check mitm type  */
   switch(mitm) {
   
   case NDP_SPOOFING:
@@ -191,7 +190,7 @@ int main(int argc, char **argv)
     pcap_close(pcap);
     return EXIT_FAILURE;
   }
-
+  
   /* Start sniffing */
   pcap_loop(pcap, 0, &process_packet, NULL);
 

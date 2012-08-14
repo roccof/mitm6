@@ -18,8 +18,18 @@
  */
 
 #include "mitm6.h"
+#include "protos.h"
+
+static int is_icmp6_ns(const _uchar *bytes, size_t len)
+{
+  return 0;
+}
 
 void ndp_spoof(const _uchar *bytes, size_t len)
 {
-  debug("RECV %d bytes");
+  size_t totlen = 0;
+  ipv6_t *ip = NULL;
+  icmp6_t *icmp = NULL;
+  
+  
 }
