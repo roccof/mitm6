@@ -33,34 +33,19 @@
 #define BITNO_2(_x) (((_x) & 2) ? 1 : 0)
 #define BIT(_n)	(1 << _n)
 
-typedef unsigned char _uint8;
-typedef unsigned short _uint16;
-typedef unsigned int _uint32;
-typedef unsigned long _uint64;
-
-typedef char _int8;
-typedef short _int16;
-typedef int _int32;
-typedef long _int64;
-
-typedef unsigned char _uchar;
-typedef unsigned short _ushort;
-typedef unsigned int _uint;
-typedef unsigned long _ulong;
-
-typedef enum _mitm_attacks {
-  NDP_SPOOFING,
-  SLAAC_ATTACK,
-  ICMP6_REDIR,
-  NONE
-} mitm_t;
+enum mitm {
+        NDP_SPOOFING,
+        SLAAC_ATTACK,
+        ICMP6_REDIR,
+        NONE
+};
 
 void fatal(const char *message, ...);
 void debug(const char *message, ...);
 void warning(const char *message, ...);
 
-void inject_packet(_uchar *bytes, size_t len);
+void inject_packet(u_char *bytes, size_t len);
 
-void ndp_spoof(const _uchar *bytes, size_t len);
+void ndp_spoof(const u_char *bytes, size_t len);
 
 #endif /* MITM6_H */

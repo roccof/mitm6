@@ -10,13 +10,13 @@ all: mitm6
 install:
 	@echo "TODO..."
 
-$(OBJS): %.o: %.c
+$(OBJS): %.o: %.c $(HDR)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-mitm6: $(OBJS) $(HDR)
+mitm6: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 clean:
-	@rm -f src/*.o $(PROG_NAME) *~ src/*~
+	@rm -f src/*.o ./mitm6 *~ src/*~
 
 .PHONY: clean
