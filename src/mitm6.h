@@ -45,8 +45,7 @@ void fatal(const char *message, ...);
 void debug(const char *message, ...);
 void warning(const char *message, ...);
 
-/* uint16_t calculate_cksum(struct in6_addr *src, struct in6_addr *dst, uint8_t nxt_hdr, u_char *icmp, size_t icmp_len); */
-
+int calculate_checksum(u_char *src, u_char *dst, uint8_t nxt, u_char *data, int len);
 void inject_packet(u_char *bytes, size_t len);
 
 void ndp_spoof(const u_char *bytes, size_t len);

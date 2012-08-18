@@ -19,13 +19,47 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "mitm6.h"
 
-/* uint16_t calculate_cksum(struct in6_addr *src, struct in6_addr *dst, uint8_t nxt_hdr, u_char *icmp, size_t icmp_len) */
-/* { */
-/*         return 0; */
-/* } */
+int calculate_checksum(u_char *src, u_char *dst, uint8_t nxt, u_char *data, int len)
+{
+        u_char buf[40 + len];
+        u_char *ptr = NULL;
+        int checksum = 0;
+        int i = 0;
+        int buflen = 40 + len;
+        
+        if (buflen > 65535)
+                warning("checksums > 65535");
+        
+        bzero(&buf, buflen);
+
+        memcpy(&buf[0], src, 16);
+        memcpy(&buf[16], dst, 16);
+        buf[34] = len / 256;
+        buf[35] = len % 256;
+        buf[39] = nxt;
+        if (data != NULL && len > 0)
+                memcpy(&buf[40], data, len);
+
+        /* Calculate checksum */
+        ptr = buf;
+        while (i < buflen) {
+                if (i++ % 2 == 0)
+                        checksum += *ptr++;
+                else
+                        checksum += *ptr++ << 8;
+        }
+        
+        checksum = (checksum & 0xffff) + (checksum >> 16);
+        checksum = htons(~checksum);
+
+        debug("Checksum: 0x%x = %p, %p, %d, %p, %d", checksum, src, dst, nxt, data, len);
+        
+        return checksum;
+}
 
 void fatal(const char *message, ...)
 {

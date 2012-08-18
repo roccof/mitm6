@@ -33,6 +33,7 @@ void ndp_spoof(const u_char *bytes, size_t len)
         struct nd_neighbor_advert na;
         char sspoof[INET6_ADDRSTRLEN];
         struct packet *p = NULL;
+        int cksum = 0;
 
         ether = (struct ether_header *)bytes;
         ip = (struct ip6_hdr *)(bytes + sizeof(struct ether_header));
@@ -61,7 +62,10 @@ void ndp_spoof(const u_char *bytes, size_t len)
                 /* na.nd_na_hdr.icmp6_data32[0] &= 0x40000000; */
                 na.nd_na_target = ns->nd_ns_target;
 
-                /* TODO: cksum */
+                cksum = calculate_checksum((u_char *)&(ns->nd_ns_target), (u_char *)&(ip->ip6_src), 
+                                           IPPROTO_ICMPV6, (u_char *)&na, sizeof(struct nd_neighbor_advert));
+
+                na.nd_na_hdr.icmp6_cksum = cksum;
 
                 /* TODO: insert my mac address!!! */
                 p = packet_init();
