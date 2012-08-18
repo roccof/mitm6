@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <pcap.h>
+#include <inttypes.h>
 
 #define DEBUG
 
@@ -43,6 +44,8 @@ enum mitm {
 void fatal(const char *message, ...);
 void debug(const char *message, ...);
 void warning(const char *message, ...);
+
+/* uint16_t calculate_cksum(struct in6_addr *src, struct in6_addr *dst, uint8_t nxt_hdr, u_char *icmp, size_t icmp_len); */
 
 void inject_packet(u_char *bytes, size_t len);
 

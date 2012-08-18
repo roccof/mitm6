@@ -22,6 +22,11 @@
 
 #include "mitm6.h"
 
+/* uint16_t calculate_cksum(struct in6_addr *src, struct in6_addr *dst, uint8_t nxt_hdr, u_char *icmp, size_t icmp_len) */
+/* { */
+/*         return 0; */
+/* } */
+
 void fatal(const char *message, ...)
 {
         va_list ap;

