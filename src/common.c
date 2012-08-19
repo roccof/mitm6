@@ -20,8 +20,64 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#include <ifaddrs.h>
+#include <unistd.h>
 
 #include "mitm6.h"
+
+int get_mtu(char *iface)
+{
+        int s;
+        struct ifreq ifr;
+        
+        if (iface == NULL)
+                return -1;
+                        
+        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+                return -1;
+
+        memset(&ifr, 0, sizeof(ifr));
+        snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", iface);
+        
+        if (ioctl(s, SIOCGIFMTU, (int8_t *) & ifr) < 0)
+                return -1;
+        
+        close(s);
+        debug("MTU: %d", ifr.ifr_mtu);
+        
+        return ifr.ifr_mtu;
+}
+
+u_char *get_mac(char *iface)
+{
+        int s;
+        struct ifreq ifr;
+        u_char *mac;
+        
+        if (iface == NULL)
+                return NULL;
+        
+        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+                return NULL;
+
+        memset(&ifr, 0, sizeof(ifr));
+        snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", iface);
+        if (ioctl(s, SIOCGIFHWADDR, (int8_t *) & ifr) < 0)
+                return NULL;
+        
+        mac = (u_char *)malloc(6);
+        memcpy(mac, &ifr.ifr_hwaddr.sa_data, 6);
+        close(s);
+        
+        debug("MAC address: %02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        
+        return mac;
+}
 
 int calculate_checksum(u_char *src, u_char *dst, uint8_t nxt, u_char *data, int len)
 {

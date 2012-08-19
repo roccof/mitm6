@@ -41,6 +41,8 @@ static int cap_snaplen = 65535;
 static enum mitm mitm = NONE;
 static const char *short_options = "hvi:m:";
 
+char *iface = NULL;
+
 static void usage()
 {
         printf("USAGE: mitm6 [OPTIONS]\n");
@@ -101,7 +103,6 @@ int main(int argc, char **argv)
 {
         int next_opt = 0;
         int opt_index = 0;
-        char *iface = NULL;
         int promisc = 1;
         int cap_timeout = 0;
         char errbuf[PCAP_ERRBUF_SIZE];

