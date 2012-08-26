@@ -29,6 +29,20 @@
 #include <unistd.h>
 
 #include "mitm6.h"
+#include "packet.h"
+
+int get_iface_index(int sockfd, char *device)
+{
+  struct ifreq ifr;
+  
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
+  
+  if (ioctl(sockfd, SIOCGIFINDEX, &ifr) == -1)
+    return -1;
+  
+  return ifr.ifr_ifindex;
+}
 
 int get_mtu(char *iface)
 {
@@ -74,47 +88,9 @@ u_char *get_mac(char *iface)
         memcpy(mac, &ifr.ifr_hwaddr.sa_data, 6);
         close(s);
         
-        debug("MAC address: %02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        debug("own MAC address: %02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         
         return mac;
-}
-
-int calculate_checksum(u_char *src, u_char *dst, uint8_t nxt, u_char *data, int len)
-{
-        u_char buf[40 + len];
-        u_char *ptr = NULL;
-        int checksum = 0;
-        int i = 0;
-        int buflen = 40 + len;
-        
-        if (buflen > 65535)
-                warning("checksums > 65535");
-        
-        bzero(&buf, buflen);
-
-        memcpy(&buf[0], src, 16);
-        memcpy(&buf[16], dst, 16);
-        buf[34] = len / 256;
-        buf[35] = len % 256;
-        buf[39] = nxt;
-        if (data != NULL && len > 0)
-                memcpy(&buf[40], data, len);
-
-        /* Calculate checksum */
-        ptr = buf;
-        while (i < buflen) {
-                if (i++ % 2 == 0)
-                        checksum += *ptr++;
-                else
-                        checksum += *ptr++ << 8;
-        }
-        
-        checksum = (checksum & 0xffff) + (checksum >> 16);
-        checksum = htons(~checksum);
-
-        debug("Checksum: 0x%x = %p, %p, %d, %p, %d", checksum, src, dst, nxt, data, len);
-        
-        return checksum;
 }
 
 void fatal(const char *message, ...)

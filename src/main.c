@@ -36,11 +36,11 @@ static const struct option long_options[] = {
         {NULL, 0, NULL, 0}
 };
 
-static pcap_t *pcap = NULL;
 static int cap_snaplen = 65535;
 static enum mitm mitm = NONE;
 static const char *short_options = "hvi:m:";
 
+pcap_t *pcap = NULL;
 char *iface = NULL;
 
 static void usage()
@@ -92,11 +92,6 @@ static void process_packet(u_char *user, const struct pcap_pkthdr *header, const
         default:
                 break;
         }
-}
-
-void inject_packet(u_char *bytes, size_t len)
-{
-        pcap_inject(pcap, (void *)bytes, len);
 }
 
 int main(int argc, char **argv)

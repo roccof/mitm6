@@ -49,10 +49,9 @@ void fatal(const char *message, ...);
 void debug(const char *message, ...);
 void warning(const char *message, ...);
 
+int get_iface_index(int sockfd, char *device);
 int get_mtu(char *iface);
 u_char *get_mac(char *iface);
-int calculate_checksum(u_char *src, u_char *dst, uint8_t nxt, u_char *data, int len);
-void inject_packet(u_char *bytes, size_t len);
 
 void ndp_spoof(const u_char *bytes, size_t len);
 
