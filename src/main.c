@@ -48,7 +48,7 @@ static void usage()
         printf("   -i, --iface <iface>         network interface\n");
         printf(" [ATTACK]\n");
         printf("   ndp-spoof\n");
-        printf("   slaac [OPT]\n");
+        printf("   slaac [net-addr] [prefix]\n");
 }
 
 static void version()
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
         }
 
         /* Open the device for capturing */
-        pcap = pcap_open_live(iface, CAP_SNAPLEN, 1, 0, errbuf);
+        pcap = pcap_open_live(iface, CAP_SNAPLEN, 1, -1, errbuf);
         if (pcap == NULL) {
                 fatal(errbuf);
                 exit(-1);

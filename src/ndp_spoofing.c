@@ -75,6 +75,8 @@ void start_ndp_spoof()
         mac = thc_get_own_mac(iface);
         if (mac == NULL)
                 fatal("unable to get own mac address for %s iface", iface);
+
+        printf("Starting spoofer...(Press Control-C to end)\n");
         
         /* Start sniffing */
         pcap_loop(pcap, 0, &proc, NULL);
