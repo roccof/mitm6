@@ -49,10 +49,14 @@ static void usage()
         printf("  -h, --help                  print this help\n");
         printf("  -v, --version               print version\n");
         printf("  -i, --iface <iface>         network interface\n");
-        printf("  -m, --mitm <method>         MiTM attack\n");
+        printf("  -m, --mitm <method>         MiTM attack:\n");
+        printf("                                 1 NDP Spoofing\n");
+        printf("                                 2 SLAAC Attack\n");
+        printf("                                 3 ICMPv6 Redirect\n");
         printf("  --no-promisc                don't set iface in promisc mode\n");
         printf("  --cap-timeout               packet capture timeout, the default is 0 ms\n");
-        printf("  --cap-snaplen               bytes of data of captured packet, the default is 65535 bytes\n");
+        printf("  --cap-snaplen               bytes of data of captured packet, the default\n");
+        printf("                              is 65535 bytes\n");
 }
 
 static void version()
@@ -83,8 +87,13 @@ static void process_packet(u_char *user, const struct pcap_pkthdr *header, const
         switch(mitm) {
   
         case NDP_SPOOFING:
-                debug("got packet of %d bytes", header->len);
                 ndp_spoof(bytes, header->len);
+                break;
+
+        case SLAAC_ATTACK:
+                break;
+
+        case ICMP6_REDIR:
                 break;
   
         case NONE:

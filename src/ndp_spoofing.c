@@ -37,8 +37,6 @@ void ndp_spoof(const u_char *bytes, size_t len)
 
         if (buf[20] == NXT_ICMP6 && buf[54] == ICMP6_NEIGHBORSOL) {
 
-                thc_dump_data((u_char *)bytes, len, "Recv Pkt");
-
                 packet = thc_create_ipv6(iface, PREFER_LINK, &buflen, buf + 62, buf + 22, 255, 0, 0, 0, 0);
                 if (packet == NULL) {
                         fatal("IPv6 packet not created");
