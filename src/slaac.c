@@ -16,31 +16,22 @@
  * You should have received a copy of the GNU General Public License
  * along with mitm6.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef MITM6_H
-#define MITM6_H
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
+#include <arpa/inet.h>
+#include <string.h>
 #include <pcap.h>
-#include <inttypes.h>
 
-#define DEBUG
+#include "mitm6.h"
+#include "thc-ipv6.h"
 
-#define CAP_SNAPLEN 65535
+extern char *iface;
+extern pcap_t *pcap;
 
-void fatal(const char *message, ...);
-void debug(const char *message, ...);
-void warning(const char *message, ...);
+void start_slaac()
+{
+        debug("slaac");
+}
 
-int get_iface_index(int sockfd, char *device);
-int get_mtu(char *iface);
-u_char *get_mac(char *iface);
-
-void start_ndp_spoof();
-void stop_ndp_spoof();
-
-void start_slaac();
-void stop_slaac();
-
-#endif /* MITM6_H */
+void stop_slaac()
+{
+        
+}

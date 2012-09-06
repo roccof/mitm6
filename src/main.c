@@ -29,34 +29,26 @@ static const struct option long_options[] = {
         {"help", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 'v'},
         {"iface", required_argument, NULL, 'i'},
-        {"mitm", required_argument, NULL, 'M'},
-        {"no-promisc", no_argument, NULL, 0},
-        {"cap-timeout", required_argument, NULL, 0},
-        {"cap-snaplen", required_argument, NULL, 0},
         {NULL, 0, NULL, 0}
 };
 
-static int cap_snaplen = 65535;
-static enum mitm mitm = NONE;
-static const char *short_options = "hvi:m:";
+static const char *short_options = "hvi:";
 
 pcap_t *pcap = NULL;
 char *iface = NULL;
 
+static int mitm = 0;
+
 static void usage()
 {
-        printf("USAGE: mitm6 [OPTIONS]\n");
-        printf("  -h, --help                  print this help\n");
-        printf("  -v, --version               print version\n");
-        printf("  -i, --iface <iface>         network interface\n");
-        printf("  -m, --mitm <method>         MiTM attack:\n");
-        printf("                                 1 NDP Spoofing\n");
-        printf("                                 2 SLAAC Attack\n");
-        printf("                                 3 ICMPv6 Redirect\n");
-        printf("  --no-promisc                don't set iface in promisc mode\n");
-        printf("  --cap-timeout               packet capture timeout, the default is 0 ms\n");
-        printf("  --cap-snaplen               bytes of data of captured packet, the default\n");
-        printf("                              is 65535 bytes\n");
+        printf("USAGE: mitm6 [OPTIONS] [ATTACK]\n");
+        printf(" [OPTIONS]\n");
+        printf("   -h, --help                  print this help\n");
+        printf("   -v, --version               print version\n");
+        printf("   -i, --iface <iface>         network interface\n");
+        printf(" [ATTACK]\n");
+        printf("   ndp-spoof\n");
+        printf("   slaac [OPT]\n");
 }
 
 static void version()
@@ -68,50 +60,19 @@ static void version()
 
 static void signal_handler_cb(int signal)
 {
-        /* TODO: check for multiples CTRL-C */
-        pcap_breakloop(pcap);
-}
-
-static void process_packet(u_char *user, const struct pcap_pkthdr *header, const u_char *bytes)
-{
-        if (header->len == 0 || bytes == NULL)
-                return;
-
-        /* Skip truncated packets */
-        if (header->len > cap_snaplen) {
-                debug("captured truncated packet [pkt-len: %d, snaplen: %d], skipping...",
-                      header->len, cap_snaplen);
-                return;
-        }
-        
-        switch(mitm) {
-  
-        case NDP_SPOOFING:
-                ndp_spoof(bytes, header->len);
-                break;
-
-        case SLAAC_ATTACK:
-                break;
-
-        case ICMP6_REDIR:
-                break;
-  
-        case NONE:
-                warning("MiTM attack not selected");
-        default:
-                break;
-        }
+        if (mitm == 1)
+                stop_ndp_spoof();
+        else
+                stop_slaac();
 }
 
 int main(int argc, char **argv)
 {
         int next_opt = 0;
         int opt_index = 0;
-        int promisc = 1;
-        int cap_timeout = 0;
         char errbuf[PCAP_ERRBUF_SIZE];
         struct bpf_program fp;
-
+        
         /* Register signals */
         signal(SIGINT, &signal_handler_cb);
         signal(SIGTERM, &signal_handler_cb);
@@ -119,19 +80,6 @@ int main(int argc, char **argv)
         /* Parse options */
         while ((next_opt = getopt_long(argc, argv, short_options, long_options, &opt_index)) != -1) {
                 switch (next_opt) {
-                case 0:
-                        if (strcmp(long_options[opt_index].name, "no-promisc") == 0) {
-                                promisc = 0;
-                        } else if (strcmp(long_options[opt_index].name, "cap-timeout") == 0) {
-                                cap_timeout = atoi(optarg);
-                        } else if (strcmp(long_options[opt_index].name, "cap-snaplen") == 0) {
-                                cap_snaplen = atoi(optarg);
-                        } else {
-                                fatal("'%s' is an invalid option", long_options[opt_index].name);
-                                usage();
-                                return EXIT_FAILURE;
-                        }
-                        break;
       
                 case 'h':
                         usage();
@@ -145,26 +93,6 @@ int main(int argc, char **argv)
                         iface = (char *)optarg;
                         break;
 
-                case 'm':
-                        switch(atoi((char *)optarg)) {
-                        case 1:
-                                debug("mitm attack: NDP Spoofing");
-                                mitm = NDP_SPOOFING;
-                                break;
-                        case 2:
-                                debug("mitm attack: SLAAC");
-                                mitm = SLAAC_ATTACK;
-                                break;
-                        case 3:
-                                debug("mitm attack: ICMPv6 Redirect");
-                                mitm = ICMP6_REDIR;
-                                break;
-                        default:
-                                fatal("invalid MiTM attack");
-                                return EXIT_FAILURE;
-                        }
-                        break;
-
                 default:
                         usage();
                         return EXIT_FAILURE;
@@ -172,8 +100,8 @@ int main(int argc, char **argv)
                 }
         }
 
-        if (mitm == NONE) {
-                fatal("no MiTM attack specified");
+        if (optind == argc) {
+                usage();
                 return EXIT_FAILURE;
         }
 
@@ -184,14 +112,11 @@ int main(int argc, char **argv)
         }
 
         /* Open the device for capturing */
-        pcap = pcap_open_live(iface, cap_snaplen, promisc, cap_timeout, errbuf);
+        pcap = pcap_open_live(iface, CAP_SNAPLEN, 1, 0, errbuf);
         if (pcap == NULL) {
                 fatal(errbuf);
                 exit(-1);
         }
-
-        /* TODO: enable */
-        debug("enabled IPv6 forwarding");
 
         /* Sniff only ICMPv6 packets */
         if (pcap_compile(pcap, &fp, "icmp6", 0, PCAP_NETMASK_UNKNOWN) == -1) {
@@ -206,12 +131,24 @@ int main(int argc, char **argv)
                 pcap_close(pcap);
                 return EXIT_FAILURE;
         }
-  
-        /* Start sniffing */
-        pcap_loop(pcap, 0, &process_packet, NULL);
+
+        if (strncmp(argv[optind], "ndp-spoof", 9) == 0) {
+                mitm = 1;
+                start_ndp_spoof();
+        } else if (strncmp(argv[optind], "slaac", 5) == 0) {
+                mitm = 2;
+                start_slaac();
+        } else {
+                pcap_freecode(&fp);
+                pcap_close(pcap);
+                usage();
+                return EXIT_FAILURE;
+        }
 
         pcap_freecode(&fp);
         pcap_close(pcap);
   
+        debug("closed");
+
         return 0;
 }

